@@ -3,28 +3,47 @@ __author__ = 'tanmay'
 import re
 import nltk
 import csv
+import json
 
 
 class SentimentAnalyzer:
 
-    def __init__(self, tweets, training_data_file, feature_list_file):
-        self.original_tweets = tweets
+    def __init__(self, tweets_file, training_data_file, feature_list_file):
+        self.name_of_file = tweets_file
+        tf = open(self.name_of_file, 'r')
+        l = tf.readline()
+        tweets_str = ""
+        while l:
+            tweets_str += l
+            l = tf.readline()
+
+        tweets_unicode = json.loads(tweets_str)
+        tweets = self.byteify(tweets_unicode)
+
         self.processed_tweets = []
         for i in tweets:
-            new_tweet = self.preprocess_tweet(i)
-            self.processed_tweets.append(new_tweet)
+            new_text = self.preprocess_tweet(i['text'])
+            i['text'] = new_text
+            self.processed_tweets.append(i)
 
         self.wordFeatures = []
         input_file = open(feature_list_file, 'r')
         line = input_file.readline()
-        index = 0
         while line:
-            print "line -- ", index
-            index += 1
             self.wordFeatures.append(line.strip())
             line = input_file.readline()
 
         self.classifier = self.get_NB_tained_classifer(training_data_file)
+
+    def byteify(self, input):
+        if isinstance(input, dict):
+            return {self.byteify(key):self.byteify(value) for key, value in input.iteritems()}
+        elif isinstance(input, list):
+            return [self.byteify(element) for element in input]
+        elif isinstance(input, unicode):
+            return input.encode('utf-8')
+        else:
+            return input
 
     def preprocess_tweet(self, tweet):
         # Convert to lower case
@@ -51,10 +70,7 @@ class SentimentAnalyzer:
         tweet_items = self.get_filtered_training_data(training_data_file)
 
         tweets = []
-        index1 = 0
         for (words, sentiment) in tweet_items:
-            print "classifier --- ", index1
-            index1 += 1
             words_filtered = [e.lower() for e in words.split() if(self.is_ascii(e))]
             tweets.append((words_filtered, sentiment))
 
@@ -65,10 +81,7 @@ class SentimentAnalyzer:
     def extract_features(self, document):
         document_words = set(document)
         features = {}
-        index2 = 0
         for word in self.wordFeatures:
-            print "extract --- ", index2
-            index2 += 1
             word = self.replace_two_or_more(word)
             word = word.strip('\'"?,.')
             features['contains(%s)' % word] = (word in document_words)
@@ -80,18 +93,22 @@ class SentimentAnalyzer:
         return pattern.sub(r"\1\1", s)
 
     def classify(self):
-        for i in self.processed_tweets:
-            tw = self.processed_tweets[i]
-            count = 0
-            res = {}
-            for t in tw:
-                label = self.classifier.classify(self.extract_features(t.split()))
-                print label
-                # result = {'text': t, 'tweet': self.original_tweets[i][count], 'label': label}
-                # res[count] = result
+        self.analyzed_tweets = []
+        for t in self.processed_tweets:
+            text = t['text']
+            label = self.classifier.classify(self.extract_features(text.split()))
+            print text + ": " + label
+            t['sentiment'] = label
 
-    def get_filtered_training_data(self, trainingDataFile):
-        fp = open(trainingDataFile, 'rb')
+    def write_file(self):
+        file_name = "analyzed_" + self.name_of_file
+        f = open(file_name, 'w')
+        f.write(str(self.processed_tweets))
+        f.close()
+
+
+    def get_filtered_training_data(self, training_data_file):
+        fp = open(training_data_file, 'rb')
         reader = csv.reader( fp, delimiter=',', quotechar='"', escapechar='\\' )
         tweet_items = []
         count = 1
@@ -106,17 +123,6 @@ class SentimentAnalyzer:
     def is_ascii(self, word):
         return all(ord(c) < 128 for c in word)
 
-
-all_tweets = []
-classifier_tweets = ['I love this car',
-                     'This view is amazing',
-                     'I feel great this morning',
-                     'I am so excited about the concert',
-                     'He is my best friend',
-                     'I do not like this car',
-                     'This view is terrible',
-                     'I feel tired this morning',
-                     'I am not looking forward to the concert',
-                     'He is my enemy']
-analyzer = SentimentAnalyzer(all_tweets, 'training_neatfile.csv', 'feature_list.txt')
+analyzer = SentimentAnalyzer('tweets.json', 'training_neatfile.csv', 'feature_list.txt')
 analyzer.classify()
+analyzer.write_file()
