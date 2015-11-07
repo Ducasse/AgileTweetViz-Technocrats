@@ -4,11 +4,12 @@ import re
 import nltk
 import csv
 import json
+import pickle
 
 
 class SentimentAnalyzer:
 
-    def __init__(self, tweets_file, training_data_file, feature_list_file):
+    def __init__(self, tweets_file, training_data_file, feature_list_file, dump_file, training_required=True):
         self.name_of_file = tweets_file
         tf = open(self.name_of_file, 'r')
         l = tf.readline()
@@ -33,7 +34,16 @@ class SentimentAnalyzer:
             self.wordFeatures.append(line.strip())
             line = input_file.readline()
 
-        self.classifier = self.get_NB_tained_classifer(training_data_file)
+        #call training model
+        if(training_required):
+            self.classifier = self.get_NB_tained_classifer(training_data_file, dump_file)
+        else:
+            f1 = open(dump_file)
+            if f1:
+                self.classifier = pickle.load(f1)
+                f1.close()
+            else:
+                self.classifier = self.get_NB_tained_classifer(training_data_file, dump_file)
 
     def byteify(self, input):
         if isinstance(input, dict):
@@ -65,7 +75,7 @@ class SentimentAnalyzer:
         tweet = tweet.strip('\'"')
         return tweet
 
-    def get_NB_tained_classifer(self, training_data_file):
+    def get_NB_tained_classifer(self, training_data_file, dump_file):
         # read all tweets and labels
         tweet_items = self.get_filtered_training_data(training_data_file)
 
@@ -76,11 +86,15 @@ class SentimentAnalyzer:
 
         training_set = nltk.classify.apply_features(self.extract_features, tweets)
         classifier = nltk.NaiveBayesClassifier.train(training_set)
+        outfile = open(dump_file, 'wb')
+        pickle.dump(classifier, outfile)
+        outfile.close()
         return classifier
 
     def extract_features(self, document):
         document_words = set(document)
         features = {}
+        # print document
         for word in self.wordFeatures:
             word = self.replace_two_or_more(word)
             word = word.strip('\'"?,.')
@@ -93,16 +107,18 @@ class SentimentAnalyzer:
         return pattern.sub(r"\1\1", s)
 
     def classify(self):
-        self.analyzed_tweets = []
+        index = 0
         for t in self.processed_tweets:
+            index += 1
+            print "analyzing tweet # ", index
             text = t['text']
             label = self.classifier.classify(self.extract_features(text.split()))
-            print text + ": " + label
             t['sentiment'] = label
+            print text, " : -------- ", label
 
     def write_file(self):
         file_name = "analyzed_" + self.name_of_file
-        f = open(file_name, 'w')
+        f = open(file_name, 'wb')
         f.write(str(self.processed_tweets))
         f.close()
 
@@ -111,18 +127,16 @@ class SentimentAnalyzer:
         fp = open(training_data_file, 'rb')
         reader = csv.reader( fp, delimiter=',', quotechar='"', escapechar='\\' )
         tweet_items = []
-        count = 1
         for row in reader:
             processed_tweet = self.preprocess_tweet(row[1])
             sentiment = row[0]
             tweet_item = processed_tweet, sentiment
             tweet_items.append(tweet_item)
-            count +=1
         return tweet_items
 
     def is_ascii(self, word):
         return all(ord(c) < 128 for c in word)
 
-analyzer = SentimentAnalyzer('tweets.json', 'training_neatfile.csv', 'feature_list.txt')
+analyzer = SentimentAnalyzer('tweets.json', 'training_neatfile.csv', 'feature_list.txt', 'saved_training.pickle', False)
 analyzer.classify()
 analyzer.write_file()
