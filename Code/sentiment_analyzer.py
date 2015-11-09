@@ -34,7 +34,7 @@ class SentimentAnalyzer:
             self.wordFeatures.append(line.strip())
             line = input_file.readline()
 
-        #call training model
+        # call training model
         if(training_required):
             self.classifier = self.get_NB_tained_classifer(training_data_file, dump_file)
         else:
@@ -119,7 +119,7 @@ class SentimentAnalyzer:
     def write_file(self):
         file_name = "analyzed_" + self.name_of_file
         f = open(file_name, 'wb')
-        f.write(str(self.processed_tweets))
+        f.write(json.dumps(self.processed_tweets, ensure_ascii=True))
         f.close()
 
 
