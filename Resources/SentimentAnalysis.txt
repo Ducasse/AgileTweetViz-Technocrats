@@ -1,0 +1,10 @@
+
+directoryName:='Time_Zone_Tweets'.
+
+analyzer:= RegionWiseSentimentAnalyzer new.
+
+sentimentsDict:=analyzer getSentimentsDict:directoryName.
+
+rtOSM:=RTOSMTweet new.
+
+rtOSM plotSentimentOnOSM: sentimentsDict.
