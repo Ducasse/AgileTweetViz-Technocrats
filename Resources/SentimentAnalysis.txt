@@ -1,5 +1,5 @@
 
-directoryName:='Time_Zone_Tweets'.
+directoryName:='analyzed_Time_zone_specific_tweets'.
 
 analyzer:= RegionWiseSentimentAnalyzer new.
 
